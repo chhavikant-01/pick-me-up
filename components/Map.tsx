@@ -71,6 +71,8 @@ const Map = () => {
     destinationLongitude,
   });
   useEffect(() => {
+    //todo: remove this
+    setDrivers(drivers);
     if (Array.isArray(drivers)) {
       if (!userLatitude || !userLongitude) return;
 
