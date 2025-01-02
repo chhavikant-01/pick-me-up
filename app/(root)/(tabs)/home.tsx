@@ -15,6 +15,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import Map from "@/components/Map";
 import GoogleTextInput from "@/components/GoogleTextInput";
+import { useLocationStore } from "@/store/index";
+import { useEffect, useState } from "react";
+import * as Location from "expo-location";
 
 const recentRides = [
   {
@@ -124,25 +127,88 @@ const recentRides = [
 ];
 
 export default function Page() {
+  const {
+    setUserLocation,
+    setDestinationLocation,
+    userLongitude,
+    userLatitude,
+  } = useLocationStore();
   const { user } = useUser();
   const { signOut } = useAuth();
   const loading = false;
 
-  const handleDestinationPress = () => {};
+  const [hasPermissions, setHasPermissions] = useState(false);
 
   const handleSignOut = () => {
     signOut();
     router.replace("/(auth)/sign-in");
   };
 
+  const handleDestinationPress = (location: {
+    latitude: number;
+    longitude: number;
+    address: string;
+  }) => {
+    setDestinationLocation(location);
+    router.push("/(root)/find-ride");
+  };
+
+  useEffect(() => {
+    const requestLocation = async () => {
+      // console.log("Starting location request");
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        // console.log("Permission not granted:", status);
+        setHasPermissions(false);
+        return;
+      }
+
+      try {
+        let location = await Location.getCurrentPositionAsync();
+        // console.log("Got location:", location);
+
+        const address = await Location.reverseGeocodeAsync({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+        // console.log("Got address:", address);
+
+        setUserLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          address: `${address[0].name}, ${address[0].region}`,
+        });
+
+        // Add a check after setting the location
+        // const currentState = useLocationStore.getState();
+        // console.log("Current store state:", currentState);
+      } catch (error) {
+        console.error("Error getting location:", error);
+      }
+    };
+
+    requestLocation();
+  }, []);
+
+  // useEffect(() => {
+  //   const unsubscribe = useLocationStore.subscribe((state) =>
+  //     console.log("Location store updated:", state)
+  //   );
+
+  //   return () => unsubscribe();
+  // }, []);
+
   return (
     <SafeAreaView className="bg-general-500">
       <FlatList
         data={recentRides?.slice(0, 5)}
         renderItem={({ item }) => <RideCard ride={item} />}
+        keyExtractor={(item, index) => index.toString()}
         className="px-5"
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{
+          paddingBottom: 100,
+        }}
         ListEmptyComponent={() => (
           <View className="flex flex-col items-center justify-center">
             {!loading ? (
@@ -164,10 +230,7 @@ export default function Page() {
           <>
             <View className="flex flex-row items-center justify-between my-5">
               <Text className="text-2xl font-JakartaExtraBold">
-                Welcome{" "}
-                {user?.firstName ||
-                  user?.emailAddresses[0].emailAddress.split("@")[0]}
-                👋
+                Welcome {user?.firstName}👋
               </Text>
               <TouchableOpacity
                 onPress={handleSignOut}
@@ -177,11 +240,11 @@ export default function Page() {
               </TouchableOpacity>
             </View>
 
-            {/* <GoogleTextInput
+            <GoogleTextInput
               icon={icons.search}
               containerStyle="bg-white shadow-md shadow-neutral-300"
               handlePress={handleDestinationPress}
-            /> */}
+            />
 
             <>
               <Text className="text-xl font-JakartaBold mt-5 mb-3">
